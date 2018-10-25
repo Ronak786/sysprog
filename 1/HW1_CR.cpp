@@ -10,17 +10,16 @@
 #include <chrono>
 
 using namespace std;
-//#define NUM 4
 
 
 struct task {
     int id;
     jmp_buf env;
-    vector <int> v;
+    vector<int> v;
     FILE *fp;
     int i;
     int j;
-    long int all_time=0;
+    long int all_time;
     int temp;
     bool is_finished;
     char local_data[128];
@@ -28,11 +27,11 @@ struct task {
 };
 
 int task_count;
-static struct task* tasks;
+static struct task *tasks;
 static int current_task_i = 0;
 static std::chrono::high_resolution_clock::time_point start;
 static std::chrono::high_resolution_clock::time_point finish;
-int T = 100000;
+int T;
 
 /**
  * Check not in a function, because setjmp result can not be used
@@ -41,23 +40,20 @@ int T = 100000;
  * Another way how to do not put 'check_resched' after each line -
  * do "define ; check_resched;".
  */
-#define check_resched {						\
+#define check_resched {                        \
     finish = std::chrono::high_resolution_clock::now();  \
     int temp = chrono::duration_cast<std::chrono::nanoseconds>(finish - start).count();\
-    if (temp<T){  \
-    }        \
-    else{   \
+    if (temp>=T){  \
     tasks[current_task_i].all_time += temp; \
     start = finish;   \
-        /* For an example: just resched after each line. */	\
-	int old_i = current_task_i;				\
-	current_task_i = (current_task_i + 1) % task_count;	\
-	if (setjmp(tasks[old_i].env) == 0)			\
-		longjmp(tasks[current_task_i].env, 1); }} \
+    int old_i = current_task_i;                \
+    current_task_i = (current_task_i + 1) % task_count;    \
+    if (setjmp(tasks[old_i].env) == 0)            \
+        longjmp(tasks[current_task_i].env, 1); }} \
+
 
 static void
-my_coroutine()
-{
+my_coroutine() {
 
 
     tasks[current_task_i].fp = fopen(tasks[current_task_i].local_data, "r");
@@ -65,7 +61,7 @@ my_coroutine()
     check_resched;
 
 
-    while (fscanf (tasks[current_task_i].fp, "%d", &tasks[current_task_i].temp)!=EOF){
+    while (fscanf(tasks[current_task_i].fp, "%d", &tasks[current_task_i].temp) != EOF) {
         check_resched;
         tasks[current_task_i].v.push_back(tasks[current_task_i].temp);
         check_resched;
@@ -74,19 +70,21 @@ my_coroutine()
     check_resched;
 
     //Bubble sort:)
-    for (tasks[current_task_i].i = 0; tasks[current_task_i].i < tasks[current_task_i].v.size()-1; tasks[current_task_i].i++) {
+    for (tasks[current_task_i].i = 0;
+         tasks[current_task_i].i < tasks[current_task_i].v.size() - 1; tasks[current_task_i].i++) {
         // Last i elements are already in place
         //check_resched;
-        for (tasks[current_task_i].j = 0; tasks[current_task_i].j < tasks[current_task_i].v.size()-1 -
-                tasks[current_task_i].i ; tasks[current_task_i].j++) {
+        for (tasks[current_task_i].j = 0; tasks[current_task_i].j < tasks[current_task_i].v.size() - 1 -
+                                                                    tasks[current_task_i].i; tasks[current_task_i].j++) {
             check_resched;
-            if (tasks[current_task_i].v[tasks[current_task_i].j] > tasks[current_task_i].v[tasks[current_task_i].j + 1]){
+            if (tasks[current_task_i].v[tasks[current_task_i].j] >
+                tasks[current_task_i].v[tasks[current_task_i].j + 1]) {
                 check_resched;
                 tasks[current_task_i].temp = tasks[current_task_i].v[tasks[current_task_i].j];
                 check_resched;
-                tasks[current_task_i].v[tasks[current_task_i].j] = tasks[current_task_i].v[tasks[current_task_i].j+1];
+                tasks[current_task_i].v[tasks[current_task_i].j] = tasks[current_task_i].v[tasks[current_task_i].j + 1];
                 check_resched;
-                tasks[current_task_i].v[tasks[current_task_i].j+1] = tasks[current_task_i].temp;
+                tasks[current_task_i].v[tasks[current_task_i].j + 1] = tasks[current_task_i].temp;
                 check_resched;
             }
         }
@@ -104,23 +102,24 @@ my_coroutine()
 
     check_resched;
 
-    for (tasks[current_task_i].i=0; tasks[current_task_i].i<tasks[current_task_i].v.size(); tasks[current_task_i].i++) {
+    for (tasks[current_task_i].i = 0;
+         tasks[current_task_i].i < tasks[current_task_i].v.size(); tasks[current_task_i].i++) {
         check_resched;
-        fprintf (tasks[current_task_i].fp, "%d ", tasks[current_task_i].v[tasks[current_task_i].i]);
+        fprintf(tasks[current_task_i].fp, "%d ", tasks[current_task_i].v[tasks[current_task_i].i]);
         check_resched;
     }
 
     fclose(tasks[current_task_i].fp);
 
     check_resched;
-    cout<< "Task " <<current_task_i<< " finished"<<endl;
-    cout<<"Total time is   "<< tasks[current_task_i].all_time<<" ns" <<endl;
+    cout << "Task " << current_task_i << " finished" << endl;
+    cout << "Total time is   " << tasks[current_task_i].all_time << " ns" << endl;
     tasks[current_task_i].is_finished = true;
 
     while (true) {
         bool is_all_finished = true;
         for (int i = 0; i < task_count; ++i) {
-            if (! tasks[i].is_finished) {
+            if (!tasks[i].is_finished) {
                 is_all_finished = false;
                 break;
             }
@@ -132,22 +131,19 @@ my_coroutine()
     }
 }
 
-struct MinHeapNode
-{
+struct MinHeapNode {
     int element;
     int i;
 };
 
-void swap_heap(MinHeapNode* x, MinHeapNode* y)
-{
+void swap_heap(MinHeapNode *x, MinHeapNode *y) {
     MinHeapNode temp = *x;
     *x = *y;
     *y = temp;
 }
 
-class MinHeap
-{
-    MinHeapNode* harr;
+class MinHeap {
+    MinHeapNode *harr;
     int heap_size;
 
 public:
@@ -161,29 +157,26 @@ public:
     int right(int i) { return (2 * i + 2); }
 
 
-    MinHeapNode getMin() {  return harr[0]; }
+    MinHeapNode getMin() { return harr[0]; }
 
-    void replaceMin(MinHeapNode x)
-    {
+    void replaceMin(MinHeapNode x) {
         harr[0] = x;
         MinHeapify(0);
     }
 };
 
-MinHeap::MinHeap(MinHeapNode a[], int size)
-{
+MinHeap::MinHeap(MinHeapNode a[], int size) {
     heap_size = size;
     harr = a;
     int i = (heap_size - 1) / 2;
-    while (i >= 0)
-    {
+    while (i >= 0) {
         MinHeapify(i);
         i--;
     }
 }
+
 //Recursive function to calculate mininum element of heap
-void MinHeap::MinHeapify(int i)
-{
+void MinHeap::MinHeapify(int i) {
     int l = left(i);
     int r = right(i);
     int smallest = i;
@@ -191,36 +184,32 @@ void MinHeap::MinHeapify(int i)
         smallest = l;
     if (r < heap_size && harr[r].element < harr[smallest].element)
         smallest = r;
-    if (smallest != i)
-    {
+    if (smallest != i) {
         swap_heap(&harr[i], &harr[smallest]);
         MinHeapify(smallest);
     }
 }
 
-void mergeFiles(char *output_file, int k)
-{
-    int n=0;
-    FILE* f = fopen("0", "r");
+void mergeFiles(const string &output_file, int k) {
+    int n = 0;
+    FILE *f = fopen("0", "r");
     int temp = 0;
-    while(fscanf(f, "%d", &temp)!=EOF){
+    while (fscanf(f, "%d", &temp) != EOF) {
         n++;
     }
     fclose(f);
-    FILE* in[k];
-    for (int i = 0; i < k; i++)
-    {
+    FILE *in[k];
+    for (int i = 0; i < k; i++) {
         char fileName[2];
         snprintf(fileName, sizeof(fileName), "%d", i);
         in[i] = fopen(fileName, "r");
     }
 
-    FILE *out = fopen(output_file, "w");
+    FILE *out = fopen(output_file.c_str(), "w");
 
-    MinHeapNode* harr = new MinHeapNode[k];
+    MinHeapNode *harr = new MinHeapNode[k];
     int i;
-    for (i = 0; i < k; i++)
-    {
+    for (i = 0; i < k; i++) {
         if (fscanf(in[i], "%d ", &harr[i].element) != 1)
             break;
 
@@ -229,13 +218,11 @@ void mergeFiles(char *output_file, int k)
     MinHeap hp(harr, i);
 
     int count = 0;
-    while (count != i)
-    {
+    while (count != i) {
         MinHeapNode root = hp.getMin();
         fprintf(out, "%d ", root.element);
 
-        if (fscanf(in[root.i], "%d ", &root.element) != 1 )
-        {
+        if (fscanf(in[root.i], "%d ", &root.element) != 1) {
             root.element = INT8_MAX;
             count++;
         }
@@ -249,12 +236,8 @@ void mergeFiles(char *output_file, int k)
 
     fclose(out);
 }
-int main(int argc, char *argv[])
-{
-    for (int i=1; i<argc; i++){
-        cout<<argv[i]<<endl;ls
 
-    }
+int main(int argc, char *argv[]) {
     T = atoi(argv[1]);
     task_count = argc - 2;
     tasks = new task[task_count];
@@ -262,7 +245,7 @@ int main(int argc, char *argv[])
     for (i = 0; i < task_count; ++i) {
         tasks[i].id = i;
         tasks[i].is_finished = false;
-        sprintf(tasks[i].local_data, argv[i+2]);
+        sprintf(tasks[i].local_data, "%s", argv[i + 2]);
         /* Entry point for new co-coutines. */
         setjmp(tasks[i].env);
     }
